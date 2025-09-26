@@ -1,6 +1,7 @@
 import Cocoa
 import Vision
 import CoreGraphics
+import Foundation
 
 // MARK: - Main App Entry Point
 
@@ -56,17 +57,19 @@ class ControlWindow: NSWindow {
     weak var textDetector: TextDetector?
     
     private var searchField: NSTextField!
+    private var urlField: NSTextField!
     private var statusLabel: NSTextField!
     private var startButton: NSButton!
     private var stopButton: NSButton!
     private var exactMatchCheckbox: NSButton!
     private var caseSensitiveCheckbox: NSButton!
+    private var openBrowserButton: NSButton!
     
     init(textDetector: TextDetector) {
         self.textDetector = textDetector
         
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 450, height: 250),
+            contentRect: NSRect(x: 0, y: 0, width: 450, height: 330),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -84,37 +87,37 @@ class ControlWindow: NSWindow {
         // Title Label
         let titleLabel = createLabel(
             text: "Screen Text Detector",
-            frame: NSRect(x: 20, y: 200, width: 410, height: 30),
+            frame: NSRect(x: 20, y: 280, width: 410, height: 30),
             fontSize: 18,
             weight: .bold
         )
         contentView.addSubview(titleLabel)
         
         // Search Field
-        searchField = NSTextField(frame: NSRect(x: 20, y: 150, width: 410, height: 30))
+        searchField = NSTextField(frame: NSRect(x: 20, y: 230, width: 410, height: 30))
         searchField.placeholderString = "Enter exact text to find on screen"
         contentView.addSubview(searchField)
         
         // Checkboxes
         exactMatchCheckbox = NSButton(checkboxWithTitle: "Exact match only", target: nil, action: nil)
-        exactMatchCheckbox.frame = NSRect(x: 20, y: 115, width: 200, height: 25)
+        exactMatchCheckbox.frame = NSRect(x: 20, y: 195, width: 200, height: 25)
         exactMatchCheckbox.state = .off
         contentView.addSubview(exactMatchCheckbox)
         
         caseSensitiveCheckbox = NSButton(checkboxWithTitle: "Case sensitive", target: nil, action: nil)
-        caseSensitiveCheckbox.frame = NSRect(x: 230, y: 115, width: 200, height: 25)
+        caseSensitiveCheckbox.frame = NSRect(x: 230, y: 195, width: 200, height: 25)
         caseSensitiveCheckbox.state = .off
         contentView.addSubview(caseSensitiveCheckbox)
         
-        // Buttons
-        startButton = NSButton(frame: NSRect(x: 20, y: 60, width: 200, height: 35))
+        // Detection Buttons
+        startButton = NSButton(frame: NSRect(x: 20, y: 140, width: 200, height: 35))
         startButton.title = "Start Detection"
         startButton.bezelStyle = .rounded
         startButton.target = self
         startButton.action = #selector(startDetection)
         contentView.addSubview(startButton)
         
-        stopButton = NSButton(frame: NSRect(x: 230, y: 60, width: 200, height: 35))
+        stopButton = NSButton(frame: NSRect(x: 230, y: 140, width: 200, height: 35))
         stopButton.title = "Stop Detection"
         stopButton.bezelStyle = .rounded
         stopButton.target = self
@@ -122,10 +125,24 @@ class ControlWindow: NSWindow {
         stopButton.isEnabled = false
         contentView.addSubview(stopButton)
         
+        // URL Field
+        urlField = NSTextField(frame: NSRect(x: 20, y: 90, width: 410, height: 30))
+        urlField.placeholderString = "Enter URL (e.g., https://google.com)"
+        urlField.stringValue = "https://google.com"
+        contentView.addSubview(urlField)
+        
+        // Open Browser Button
+        openBrowserButton = NSButton(frame: NSRect(x: 20, y: 50, width: 200, height: 35))
+        openBrowserButton.title = "Open Browser"
+        openBrowserButton.bezelStyle = .rounded
+        openBrowserButton.target = self
+        openBrowserButton.action = #selector(openBrowser)
+        contentView.addSubview(openBrowserButton)
+        
         // Status Label
         statusLabel = createLabel(
             text: "Ready - Enter text and click Start",
-            frame: NSRect(x: 20, y: 10, width: 410, height: 40),
+            frame: NSRect(x: 20, y: 10, width: 410, height: 30),
             fontSize: 12,
             weight: .regular
         )
@@ -147,6 +164,43 @@ class ControlWindow: NSWindow {
         return label
     }
     
+    @objc private func openBrowser() {
+        var urlString = urlField.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        
+        guard !urlString.isEmpty else {
+            statusLabel.stringValue = "Please enter a URL"
+            statusLabel.textColor = .systemRed
+            return
+        }
+        
+        // Add https:// if no protocol is specified
+        if !urlString.lowercased().hasPrefix("http://") && !urlString.lowercased().hasPrefix("https://") {
+            urlString = "https://" + urlString
+        }
+        
+        guard let url = URL(string: urlString) else {
+            statusLabel.stringValue = "Invalid URL"
+            statusLabel.textColor = .systemRed
+            return
+        }
+        
+        NSLog("🌐 Opening browser with URL: \(urlString)")
+        statusLabel.stringValue = "Opening browser..."
+        statusLabel.textColor = .systemBlue
+        
+        // Open URL in default browser
+        NSWorkspace.shared.open(url)
+        
+        statusLabel.stringValue = "Browser opened: \(urlString)"
+        statusLabel.textColor = .systemGreen
+        
+        // Reset status after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.statusLabel.stringValue = "Ready"
+            self?.statusLabel.textColor = .secondaryLabelColor
+        }
+    }
+    
     @objc private func startDetection() {
         let searchText = searchField.stringValue
         guard !searchText.isEmpty else {
@@ -164,7 +218,7 @@ class ControlWindow: NSWindow {
             caseSensitive: caseSensitive
         )
         
-        statusLabel.stringValue = "Detecting: \"\(searchText)\" (every 2 seconds)\nMode: \(exactMatch ? "Exact" : "Contains") | \(caseSensitive ? "Case-sensitive" : "Case-insensitive")"
+        statusLabel.stringValue = "Detecting: \"\(searchText)\""
         statusLabel.textColor = .systemGreen
         startButton.isEnabled = false
         stopButton.isEnabled = true
@@ -226,45 +280,91 @@ class OverlayView: NSView {
         
         guard let rect = targetRect else { return }
         
-        // Draw a highlight rectangle with border
-        let highlightPath = NSBezierPath(rect: rect)
+        // Create a rounded rectangle path with modern corner radius
+        let cornerRadius: CGFloat = min(rect.height / 2, 20) // Dynamic radius based on height
+        let roundedPath = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
         
-        // Red border
-        NSColor.systemRed.setStroke()
-        highlightPath.lineWidth = 3.0
-        highlightPath.stroke()
+        // Create gradient colors for modern look
+        let primaryColor = NSColor.systemBlue
+        let glowColor = NSColor.systemBlue.withAlphaComponent(0.3)
         
-        // Semi-transparent red fill
-        NSColor.systemRed.withAlphaComponent(0.2).setFill()
-        highlightPath.fill()
+        // Draw outer glow effect
+        let glowRect = rect.insetBy(dx: -4, dy: -4)
+        let glowPath = NSBezierPath(roundedRect: glowRect, xRadius: cornerRadius + 4, yRadius: cornerRadius + 4)
+        glowColor.withAlphaComponent(0.2).setFill()
+        glowPath.fill()
         
-        // Add corner indicators for better visibility
-        let cornerSize: CGFloat = 10
-        let cornerPath = NSBezierPath()
+        // Draw main border with gradient effect
+        primaryColor.setStroke()
+        roundedPath.lineWidth = 2.5
+        roundedPath.stroke()
         
-        // Top-left corner
-        cornerPath.move(to: NSPoint(x: rect.minX, y: rect.minY + cornerSize))
-        cornerPath.line(to: NSPoint(x: rect.minX, y: rect.minY))
-        cornerPath.line(to: NSPoint(x: rect.minX + cornerSize, y: rect.minY))
+        // Semi-transparent fill with gradient
+        primaryColor.withAlphaComponent(0.15).setFill()
+        roundedPath.fill()
         
-        // Top-right corner
-        cornerPath.move(to: NSPoint(x: rect.maxX - cornerSize, y: rect.minY))
-        cornerPath.line(to: NSPoint(x: rect.maxX, y: rect.minY))
-        cornerPath.line(to: NSPoint(x: rect.maxX, y: rect.minY + cornerSize))
+        // Add animated-style corner accents for modern look
+        let accentLength: CGFloat = 15
+        let accentPath = NSBezierPath()
+        accentPath.lineWidth = 3.0
+        primaryColor.setStroke()
         
-        // Bottom-right corner
-        cornerPath.move(to: NSPoint(x: rect.maxX, y: rect.maxY - cornerSize))
-        cornerPath.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
-        cornerPath.line(to: NSPoint(x: rect.maxX - cornerSize, y: rect.maxY))
+        // Top-left accent
+        let tlStart = NSPoint(x: rect.minX + cornerRadius, y: rect.minY)
+        accentPath.move(to: NSPoint(x: tlStart.x - accentLength, y: tlStart.y))
+        accentPath.line(to: tlStart)
+        accentPath.appendArc(
+            withCenter: NSPoint(x: rect.minX + cornerRadius, y: rect.minY + cornerRadius),
+            radius: cornerRadius,
+            startAngle: 270,
+            endAngle: 240,
+            clockwise: true
+        )
         
-        // Bottom-left corner
-        cornerPath.move(to: NSPoint(x: rect.minX + cornerSize, y: rect.maxY))
-        cornerPath.line(to: NSPoint(x: rect.minX, y: rect.maxY))
-        cornerPath.line(to: NSPoint(x: rect.minX, y: rect.maxY - cornerSize))
+        // Top-right accent
+        let trStart = NSPoint(x: rect.maxX - cornerRadius, y: rect.minY)
+        accentPath.move(to: NSPoint(x: trStart.x + accentLength, y: trStart.y))
+        accentPath.line(to: trStart)
+        accentPath.appendArc(
+            withCenter: NSPoint(x: rect.maxX - cornerRadius, y: rect.minY + cornerRadius),
+            radius: cornerRadius,
+            startAngle: 270,
+            endAngle: 300,
+            clockwise: false
+        )
         
-        NSColor.systemRed.setStroke()
-        cornerPath.lineWidth = 4.0
-        cornerPath.stroke()
+        // Bottom-right accent
+        let brStart = NSPoint(x: rect.maxX - cornerRadius, y: rect.maxY)
+        accentPath.move(to: NSPoint(x: brStart.x + accentLength, y: brStart.y))
+        accentPath.line(to: brStart)
+        accentPath.appendArc(
+            withCenter: NSPoint(x: rect.maxX - cornerRadius, y: rect.maxY - cornerRadius),
+            radius: cornerRadius,
+            startAngle: 90,
+            endAngle: 60,
+            clockwise: true
+        )
+        
+        // Bottom-left accent
+        let blStart = NSPoint(x: rect.minX + cornerRadius, y: rect.maxY)
+        accentPath.move(to: NSPoint(x: blStart.x - accentLength, y: blStart.y))
+        accentPath.line(to: blStart)
+        accentPath.appendArc(
+            withCenter: NSPoint(x: rect.minX + cornerRadius, y: rect.maxY - cornerRadius),
+            radius: cornerRadius,
+            startAngle: 90,
+            endAngle: 120,
+            clockwise: false
+        )
+        
+        accentPath.stroke()
+        
+        // Add subtle inner highlight for depth
+        let innerRect = rect.insetBy(dx: 1, dy: 1)
+        let innerPath = NSBezierPath(roundedRect: innerRect, xRadius: cornerRadius - 1, yRadius: cornerRadius - 1)
+        NSColor.white.withAlphaComponent(0.1).setStroke()
+        innerPath.lineWidth = 0.5
+        innerPath.stroke()
     }
     
     func highlightText(at rect: CGRect) {
