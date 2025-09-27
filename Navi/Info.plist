@@ -4,5 +4,9 @@
 <dict>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>This app needs screen recording permission to detect text.</string>
+	<key>com.apple.security.app-sandbox</key>
+	<string>false</string>
+	<key>com.apple.security.automation.apple-events</key>
+	<string>true</string>
 </dict>
 </plist>
