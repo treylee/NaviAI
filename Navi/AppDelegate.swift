@@ -346,7 +346,7 @@ class ControlWindow: NSWindow {
             typeMessage: ""
         )
         
-        statusLabel.stringValue = "🖱️ Looking for: \"\(searchText)\"\(autoClick ? " (Auto-click)" : "")"
+        statusLabel.stringValue = "🖱️ Hold mouse button to scan for: \"\(searchText)\""
         statusLabel.textColor = .systemBlue
         
         setClickDetectionControlsEnabled(false)
@@ -760,7 +760,7 @@ class TextDetector {
     
     func startDetecting(searchText: String, exactMatch: Bool, caseSensitive: Bool, autoClick: Bool = false, autoType: Bool = false, typeMessage: String = "") {
         NSLog("\n========================================")
-        NSLog("Starting detection")
+        NSLog("Starting detection (mouse-triggered)")
         NSLog("Search text: '\(searchText)'")
         NSLog("========================================\n")
         
@@ -779,12 +779,56 @@ class TextDetector {
             return
         }
         
-        DispatchQueue.main.async { [weak self] in
-            self?.timer?.invalidate()
-            self?.timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                self?.detectText()
+        // Set up mouse event monitoring instead of timer
+        setupMouseHoldDetection()
+        
+        NSLog("✅ Ready - Hold down mouse button to scan for text")
+    }
+    
+    private func setupMouseHoldDetection() {
+        // Remove any existing mouse monitor
+        if let monitor = mouseEventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        
+        // Monitor for mouse down and up events
+        mouseEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown]) { [weak self] event in
+            guard let self = self else { return }
+            
+            if event.type == .leftMouseDown {
+                // Start detection when mouse is pressed
+                NSLog("🖱️ Mouse down - starting detection")
+                
+                // Start a repeating timer while mouse is held
+                DispatchQueue.main.async {
+                    self.timer?.invalidate()
+                    
+                    // Do initial detection immediately
+                    self.detectText()
+                    
+                    // Then repeat every 1 second while held
+                    self.timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                        self.detectText()
+                    }
+                }
+                
+            } else if event.type == .leftMouseUp {
+                // Stop detection when mouse is released
+                NSLog("🖱️ Mouse up - pausing detection")
+                
+                DispatchQueue.main.async {
+                    self.timer?.invalidate()
+                    self.timer = nil
+                    // Keep overlay visible so user can see what was found
+                }
+                
+            } else if event.type == .rightMouseDown {
+                // Right-click to clear overlay
+                NSLog("🖱️ Right-click - clearing overlay")
+                DispatchQueue.main.async {
+                    self.overlayWindow?.clearOverlay()
+                }
             }
-            self?.detectText()
         }
     }
     
@@ -817,6 +861,13 @@ class TextDetector {
         NSLog("\n❌ Stopping detection")
         timer?.invalidate()
         timer = nil
+        
+        // Clean up mouse event monitor if not being used for selection monitoring
+        if !isMonitoringSelection && mouseEventMonitor != nil {
+            NSEvent.removeMonitor(mouseEventMonitor!)
+            mouseEventMonitor = nil
+        }
+        
         overlayWindow?.clearOverlay()
         lastFoundRect = nil
         consecutiveMatchCount = 0
