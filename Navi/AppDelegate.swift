@@ -68,7 +68,7 @@ class ControlWindow: NSWindow {
     private var typeAutoCheckbox: NSButton!
     private var startTypeDetectionButton: NSButton!
     
-    // Section 3: Text Selection Monitor
+    // Section 3: Text Selection Monitor (NEW)
     private var selectionMonitorButton: NSButton!
     private var selectionStatusLabel: NSTextField!
     private var isAutoMonitoring = false
@@ -219,7 +219,7 @@ class ControlWindow: NSWindow {
         
         // Selection Status Label
         selectionStatusLabel = createLabel(
-            text: "Auto-monitor is OFF",
+            text: "Auto-detect is OFF",
             frame: NSRect(x: 20, y: 145, width: 410, height: 20),
             fontSize: 11,
             weight: .regular
@@ -229,20 +229,12 @@ class ControlWindow: NSWindow {
         contentView.addSubview(selectionStatusLabel)
         
         // Auto Monitor Toggle Button
-        selectionMonitorButton = NSButton(frame: NSRect(x: 20, y: 105, width: 200, height: 32))
-        selectionMonitorButton.title = "▶️ Start Auto-Monitor"
+        selectionMonitorButton = NSButton(frame: NSRect(x: 20, y: 105, width: 410, height: 32))
+        selectionMonitorButton.title = "▶️ Start Auto-Detect Selections"
         selectionMonitorButton.bezelStyle = .rounded
         selectionMonitorButton.target = self
         selectionMonitorButton.action = #selector(toggleAutoMonitor)
         contentView.addSubview(selectionMonitorButton)
-        
-        // Manual Capture Button
-        let manualCaptureButton = NSButton(frame: NSRect(x: 230, y: 105, width: 200, height: 32))
-        manualCaptureButton.title = "📋 Manual Capture (Cmd+C)"
-        manualCaptureButton.bezelStyle = .rounded
-        manualCaptureButton.target = self
-        manualCaptureButton.action = #selector(captureSelectedText)
-        contentView.addSubview(manualCaptureButton)
         
         // Divider
         let divider3 = NSBox(frame: NSRect(x: 20, y: 85, width: 410, height: 1))
@@ -309,7 +301,7 @@ class ControlWindow: NSWindow {
             NSLog("🔴 Stopping auto-monitoring...")
             textDetector?.stopSelectionMonitoring()
             
-            selectionMonitorButton.title = "▶️ Start Auto-Detect"
+            selectionMonitorButton.title = "▶️ Start Auto-Detect Selections"
             selectionStatusLabel.stringValue = "Auto-detect is OFF"
             selectionStatusLabel.textColor = .secondaryLabelColor
             
@@ -328,45 +320,6 @@ class ControlWindow: NSWindow {
                 if self?.isAutoMonitoring == true {
                     self?.selectionStatusLabel.stringValue = "AUTO-DETECT ON - Just select text!"
                     self?.selectionStatusLabel.textColor = .systemGreen
-                }
-            }
-        }
-    }
-    
-    @objc private func captureSelectedText() {
-        NSLog("📋 Capturing selected text via clipboard...")
-        
-        // Simulate Cmd+C to copy selected text
-        if let source = CGEventSource(stateID: .hidSystemState) {
-            let cmdCDown = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true) // 8 = C key
-            cmdCDown?.flags = .maskCommand
-            let cmdCUp = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false)
-            cmdCUp?.flags = .maskCommand
-            
-            cmdCDown?.post(tap: .cghidEventTap)
-            usleep(50_000) // 50ms delay
-            cmdCUp?.post(tap: .cghidEventTap)
-            
-            // Wait for clipboard to update
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                let pasteboard = NSPasteboard.general
-                if let text = pasteboard.string(forType: .string), !text.isEmpty {
-                    NSLog("✅ Captured text: '\(String(text.prefix(100)))\(text.count > 100 ? "..." : "")'")
-                    
-                    self?.selectionStatusLabel.stringValue = "Captured: \(text.prefix(50))..."
-                    self?.selectionStatusLabel.textColor = .systemGreen
-                    
-                    // Show the text in overlay
-                    self?.textDetector?.showCapturedText(text)
-                    
-                    // Reset label after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        self?.selectionStatusLabel.stringValue = "Select any text and press Cmd+C to capture"
-                        self?.selectionStatusLabel.textColor = .secondaryLabelColor
-                    }
-                } else {
-                    self?.selectionStatusLabel.stringValue = "No text captured - select text first"
-                    self?.selectionStatusLabel.textColor = .systemRed
                 }
             }
         }
@@ -396,8 +349,8 @@ class ControlWindow: NSWindow {
         statusLabel.stringValue = "🖱️ Looking for: \"\(searchText)\"\(autoClick ? " (Auto-click)" : "")"
         statusLabel.textColor = .systemBlue
         
-        startClickDetectionButton.isEnabled = false
-        startTypeDetectionButton.isEnabled = false
+        setClickDetectionControlsEnabled(false)
+        setTypeDetectionControlsEnabled(true)
         stopButton.isEnabled = true
     }
     
@@ -420,8 +373,8 @@ class ControlWindow: NSWindow {
         statusLabel.stringValue = "⌨️ Looking for text input field to type: \"\(message)\""
         statusLabel.textColor = .systemGreen
         
-        startClickDetectionButton.isEnabled = false
-        startTypeDetectionButton.isEnabled = false
+        setTypeDetectionControlsEnabled(false)
+        setClickDetectionControlsEnabled(true)
         stopButton.isEnabled = true
     }
     
@@ -431,25 +384,51 @@ class ControlWindow: NSWindow {
         statusLabel.stringValue = "Detection stopped"
         statusLabel.textColor = .secondaryLabelColor
         
-        startClickDetectionButton.isEnabled = true
-        startTypeDetectionButton.isEnabled = true
+        setClickDetectionControlsEnabled(true)
+        setTypeDetectionControlsEnabled(true)
         stopButton.isEnabled = false
     }
     
+    private func setClickDetectionControlsEnabled(_ enabled: Bool) {
+        clickSearchField.isEnabled = enabled
+        clickExactMatchCheckbox.isEnabled = enabled
+        clickCaseSensitiveCheckbox.isEnabled = enabled
+        clickAutoCheckbox.isEnabled = enabled
+        startClickDetectionButton.isEnabled = enabled
+    }
+    
+    private func setTypeDetectionControlsEnabled(_ enabled: Bool) {
+        typeMessageField.isEnabled = enabled
+        typeAutoCheckbox.isEnabled = enabled
+        startTypeDetectionButton.isEnabled = enabled
+    }
+    
     @objc private func openBrowser() {
-        let urlString = "https://google.com"
+        var urlString = urlField.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         
-        if let url = URL(string: urlString) {
-            NSLog("🌐 Opening browser with URL: \(urlString)")
-            NSWorkspace.shared.open(url)
-            
-            statusLabel.stringValue = "Browser opened: \(urlString)"
-            statusLabel.textColor = .systemGreen
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                self?.statusLabel.stringValue = "Ready"
-                self?.statusLabel.textColor = .secondaryLabelColor
-            }
+        if urlString.isEmpty {
+            urlString = "https://google.com"
+        }
+        
+        if !urlString.lowercased().hasPrefix("http://") && !urlString.lowercased().hasPrefix("https://") {
+            urlString = "https://" + urlString
+        }
+        
+        guard let url = URL(string: urlString) else {
+            statusLabel.stringValue = "Invalid URL"
+            statusLabel.textColor = .systemRed
+            return
+        }
+        
+        NSLog("🌐 Opening browser with URL: \(urlString)")
+        NSWorkspace.shared.open(url)
+        
+        statusLabel.stringValue = "Browser opened: \(urlString)"
+        statusLabel.textColor = .systemGreen
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.statusLabel.stringValue = "Ready"
+            self?.statusLabel.textColor = .secondaryLabelColor
         }
     }
 }
@@ -466,7 +445,6 @@ class OverlayWindow: NSWindow {
             defer: false
         )
         
-        // Make window transparent and click-through
         self.isOpaque = false
         self.backgroundColor = .clear
         self.level = .statusBar
@@ -493,7 +471,7 @@ class OverlayWindow: NSWindow {
     }
 }
 
-// MARK: - Overlay View
+// MARK: - Overlay View (with captured text display)
 class OverlayView: NSView {
     private var targetRect: CGRect?
     private var clickPoint: CGPoint?
@@ -520,7 +498,6 @@ class OverlayView: NSView {
     }
     
     private func drawCapturedTextOverlay(_ text: String) {
-        // Draw at top of screen
         let maxWidth: CGFloat = 600
         let x = (bounds.width - maxWidth) / 2
         let y = bounds.height - 150
@@ -569,6 +546,18 @@ class OverlayView: NSView {
         highlightColor.setStroke()
         roundedPath.lineWidth = 2.0
         roundedPath.stroke()
+        
+        // Dot indicator
+        let dotRadius: CGFloat = 4
+        let dotPath = NSBezierPath()
+        dotPath.appendOval(in: NSRect(
+            x: expandedRect.minX - dotRadius - 5,
+            y: expandedRect.midY - dotRadius,
+            width: dotRadius * 2,
+            height: dotRadius * 2
+        ))
+        highlightColor.setFill()
+        dotPath.fill()
     }
     
     private func drawClickIndicator(_ point: CGPoint) {
@@ -626,9 +615,9 @@ class OverlayView: NSView {
     }
 }
 
-// MARK: - Text Detector (Simplified)
+// MARK: - Text Detector (Integrated with all features)
 class TextDetector {
-    weak var overlayWindow: OverlayWindow?
+    private weak var overlayWindow: OverlayWindow?
     private var timer: Timer?
     private var searchText: String = ""
     private var exactMatch: Bool = false
@@ -641,33 +630,29 @@ class TextDetector {
     private var lastMatchRect: CGRect?
     private var isDetectingTextField: Bool = false
     
-    // Text selection monitoring
+    // Selection monitoring additions
     private var selectionMonitorTimer: Timer?
     private var mouseEventMonitor: Any?
-    private var lastPasteboardChangeCount: Int = 0
     private var lastClipboardContent: String = ""
     private var isMonitoringSelection: Bool = false
     private var isProcessingSelection: Bool = false
     
     init(overlayWindow: OverlayWindow) {
         self.overlayWindow = overlayWindow
-        // Initialize pasteboard change count
-        lastPasteboardChangeCount = NSPasteboard.general.changeCount
+        
+        // Initialize clipboard content
         if let content = NSPasteboard.general.string(forType: .string) {
             lastClipboardContent = content
         }
     }
     
-    func showCapturedText(_ text: String) {
-        overlayWindow?.showCapturedText(text)
-    }
+    // MARK: - Selection Monitoring (NEW)
     
     func startSelectionMonitoring() {
         guard !isMonitoringSelection else { return }
         
-        NSLog("🔍 Starting TRUE automatic selection detection...")
+        NSLog("🔍 Starting automatic selection detection...")
         
-        // Check accessibility permission
         if !AXIsProcessTrusted() {
             NSLog("⚠️ Need accessibility permission for auto-detection")
             promptForAccessibilityPermission()
@@ -676,19 +661,13 @@ class TextDetector {
         
         isMonitoringSelection = true
         
-        // Save current clipboard state
-        lastPasteboardChangeCount = NSPasteboard.general.changeCount
+        // Save current clipboard
         if let content = NSPasteboard.general.string(forType: .string) {
             lastClipboardContent = content
         }
         
-        // Monitor mouse events for text selection
+        // Monitor mouse events
         setupMouseEventMonitor()
-        
-        // Also monitor clipboard changes
-        selectionMonitorTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
-            self?.checkClipboardForChanges()
-        }
         
         NSLog("✅ Auto-detection active - Just select text with your mouse!")
     }
@@ -707,18 +686,13 @@ class TextDetector {
     }
     
     private func setupMouseEventMonitor() {
-        // Monitor global mouse up events (when user finishes selecting text)
-        mouseEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .leftMouseDragged]) { [weak self] event in
+        mouseEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
             guard let self = self, self.isMonitoringSelection else { return }
             
-            if event.type == .leftMouseUp {
-                // User released mouse - check if text was selected
-                NSLog("🖱️ Mouse released - checking for selection...")
-                
-                // Small delay to let selection register
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.checkForTextSelection()
-                }
+            NSLog("🖱️ Mouse released - checking for selection...")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.checkForTextSelection()
             }
         }
         
@@ -729,52 +703,44 @@ class TextDetector {
         guard !isProcessingSelection else { return }
         isProcessingSelection = true
         
-        // Save current clipboard
         let pasteboard = NSPasteboard.general
         let savedContent = pasteboard.string(forType: .string)
         let savedChangeCount = pasteboard.changeCount
         
-        // Try to copy any selected text
         NSLog("🔍 Attempting to capture selection...")
         
         // Simulate Cmd+C
         if let source = CGEventSource(stateID: .hidSystemState) {
-            let cmdCDown = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true) // 8 = C key
+            let cmdCDown = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true)
             cmdCDown?.flags = .maskCommand
             let cmdCUp = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false)
             cmdCUp?.flags = .maskCommand
             
             cmdCDown?.post(tap: .cghidEventTap)
-            usleep(20_000) // 20ms
+            usleep(20_000)
             cmdCUp?.post(tap: .cghidEventTap)
             
-            // Check if clipboard changed after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 guard let self = self else { return }
                 
                 let newChangeCount = pasteboard.changeCount
                 
                 if newChangeCount != savedChangeCount {
-                    // Clipboard changed - we got selected text!
                     if let newText = pasteboard.string(forType: .string),
                        !newText.isEmpty,
                        newText != self.lastClipboardContent {
                         
-                        NSLog("✨ AUTO-CAPTURED: '\(String(newText.prefix(100)))\(newText.count > 100 ? "..." : "")'")
+                        NSLog("✨ AUTO-CAPTURED: '\(String(newText.prefix(100)))'")
                         
-                        // Show the captured text
-                        self.showCapturedText(newText)
+                        self.overlayWindow?.showCapturedText(newText)
                         
-                        // Update status
                         if let appDelegate = NSApp.delegate as? AppDelegate {
                             appDelegate.controlWindow?.updateSelectionStatus(newText)
                         }
                         
-                        // Save as last content
                         self.lastClipboardContent = newText
                         
-                        // Optionally restore old clipboard after showing
-                        // (Comment out if you want to keep the selection in clipboard)
+                        // Restore old clipboard
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             if let saved = savedContent, saved != newText {
                                 pasteboard.clearContents()
@@ -783,9 +749,6 @@ class TextDetector {
                             }
                         }
                     }
-                } else {
-                    // No selection detected
-                    NSLog("No text selected")
                 }
                 
                 self.isProcessingSelection = false
@@ -793,32 +756,13 @@ class TextDetector {
         }
     }
     
-    private func checkClipboardForChanges() {
-        // This is a backup method for manual Cmd+C
-        let pasteboard = NSPasteboard.general
-        let currentChangeCount = pasteboard.changeCount
-        
-        if currentChangeCount != lastPasteboardChangeCount {
-            lastPasteboardChangeCount = currentChangeCount
-            
-            if let text = pasteboard.string(forType: .string),
-               !text.isEmpty,
-               text != lastClipboardContent {
-                
-                NSLog("📋 Manual copy detected: '\(String(text.prefix(100)))\(text.count > 100 ? "..." : "")'")
-                
-                lastClipboardContent = text
-                showCapturedText(text)
-                
-                if let appDelegate = NSApp.delegate as? AppDelegate {
-                    appDelegate.controlWindow?.updateSelectionStatus(text)
-                }
-            }
-        }
-    }
+    // MARK: - Original Detection Methods
     
     func startDetecting(searchText: String, exactMatch: Bool, caseSensitive: Bool, autoClick: Bool = false, autoType: Bool = false, typeMessage: String = "") {
-        NSLog("Starting detection for: '\(searchText)'")
+        NSLog("\n========================================")
+        NSLog("Starting detection")
+        NSLog("Search text: '\(searchText)'")
+        NSLog("========================================\n")
         
         self.searchText = caseSensitive ? searchText : searchText.lowercased()
         self.exactMatch = exactMatch
@@ -845,7 +789,9 @@ class TextDetector {
     }
     
     func startDetectingTextField(typeMessage: String, autoType: Bool) {
+        NSLog("\n========================================")
         NSLog("Starting text field detection")
+        NSLog("========================================\n")
         
         self.typeMessage = typeMessage
         self.autoType = autoType
@@ -868,7 +814,7 @@ class TextDetector {
     }
     
     func stopDetecting() {
-        NSLog("Stopping detection")
+        NSLog("\n❌ Stopping detection")
         timer?.invalidate()
         timer = nil
         overlayWindow?.clearOverlay()
@@ -878,16 +824,333 @@ class TextDetector {
         isDetectingTextField = false
     }
     
+    // [All the original methods remain the same: detectText, processResults, detectTextFields, etc.]
+    // Including them here for completeness...
+    
     private func detectText() {
-        // Original detectText implementation
-        NSLog("Scanning screen...")
-        // ... (keep existing detectText implementation)
+        NSLog("\n🔍 Scanning screen for: '\(searchText)'")
+        
+        guard let screen = NSScreen.main else { return }
+        
+        let displayID = CGMainDisplayID()
+        guard let screenshot = CGDisplayCreateImage(displayID) else {
+            NSLog("ERROR: Cannot capture screen")
+            return
+        }
+        
+        let imageWidth = CGFloat(screenshot.width)
+        let imageHeight = CGFloat(screenshot.height)
+        
+        let request = VNRecognizeTextRequest { [weak self] request, error in
+            if let error = error {
+                NSLog("ERROR: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let self = self,
+                  let observations = request.results as? [VNRecognizedTextObservation] else {
+                NSLog("No text found on screen")
+                return
+            }
+            
+            NSLog("Found \(observations.count) text regions")
+            
+            DispatchQueue.main.async {
+                self.processResults(observations, imageSize: CGSize(width: imageWidth, height: imageHeight))
+            }
+        }
+        
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        request.recognitionLanguages = ["en-US"]
+        request.minimumTextHeight = 0.0
+        
+        let handler = VNImageRequestHandler(cgImage: screenshot, options: [:])
+        
+        do {
+            try handler.perform([request])
+        } catch {
+            NSLog("ERROR: \(error.localizedDescription)")
+        }
+    }
+    
+    private func processResults(_ observations: [VNRecognizedTextObservation], imageSize: CGSize) {
+        overlayWindow?.clearOverlay()
+        lastFoundRect = nil
+        
+        var foundMatch = false
+        
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.frame
+        
+        for (index, observation) in observations.enumerated() {
+            guard let recognizedText = observation.topCandidates(1).first?.string else { continue }
+            
+            let textToCompare = caseSensitive ? recognizedText : recognizedText.lowercased()
+            
+            let isMatch: Bool
+            if exactMatch {
+                isMatch = textToCompare == searchText
+            } else {
+                isMatch = textToCompare.contains(searchText)
+            }
+            
+            if isMatch {
+                NSLog("\n✅ FOUND MATCH!")
+                
+                let box = observation.boundingBox
+                
+                let screenRect = CGRect(
+                    x: box.origin.x * screenFrame.width,
+                    y: box.origin.y * screenFrame.height,
+                    width: box.width * screenFrame.width,
+                    height: box.height * screenFrame.height
+                )
+                
+                lastFoundRect = screenRect
+                overlayWindow?.highlightText(at: screenRect)
+                foundMatch = true
+                
+                if autoClick {
+                    if let prevRect = lastMatchRect,
+                       abs(prevRect.origin.x - screenRect.origin.x) < 5 &&
+                       abs(prevRect.origin.y - screenRect.origin.y) < 5 {
+                        
+                        consecutiveMatchCount += 1
+                        
+                        if consecutiveMatchCount >= 2 {
+                            NSLog("✅ Element position stable, clicking...")
+                            
+                            timer?.invalidate()
+                            timer = nil
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                                self?.clickLastFoundText()
+                                self?.consecutiveMatchCount = 0
+                            }
+                        }
+                    } else {
+                        consecutiveMatchCount = 0
+                        lastMatchRect = screenRect
+                    }
+                }
+                
+                break
+            }
+        }
+        
+        if !foundMatch {
+            NSLog("❌ Text '\(searchText)' not found on screen")
+            consecutiveMatchCount = 0
+            lastMatchRect = nil
+        }
+    }
+    
+    func clickLastFoundText() {
+        guard let rect = lastFoundRect else { return }
+        
+        if !AXIsProcessTrusted() {
+            promptForAccessibilityPermission()
+            return
+        }
+        
+        guard let screen = NSScreen.main else { return }
+        
+        let centerX = rect.midX
+        let centerY = rect.midY
+        let clickY = screen.frame.height - centerY
+        
+        overlayWindow?.showClickPoint(at: CGPoint(x: centerX, y: centerY))
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.performClick(x: centerX, y: clickY)
+        }
+    }
+    
+    private func performClick(x: CGFloat, y: CGFloat) {
+        NSLog("🖱️ Performing click at (\(Int(x)), \(Int(y)))")
+        
+        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+        
+        CGDisplayMoveCursorToPoint(CGMainDisplayID(), CGPoint(x: x, y: y))
+        usleep(300_000)
+        
+        guard let mouseDown = CGEvent(
+            mouseEventSource: source,
+            mouseType: .leftMouseDown,
+            mouseCursorPosition: CGPoint(x: x, y: y),
+            mouseButton: .left
+        ),
+        let mouseUp = CGEvent(
+            mouseEventSource: source,
+            mouseType: .leftMouseUp,
+            mouseCursorPosition: CGPoint(x: x, y: y),
+            mouseButton: .left
+        ) else { return }
+        
+        mouseDown.post(tap: .cghidEventTap)
+        usleep(100_000)
+        mouseUp.post(tap: .cghidEventTap)
+        
+        NSLog("✅ Click completed!")
     }
     
     private func detectTextFields() {
-        // Original detectTextFields implementation
-        NSLog("Scanning for text fields...")
-        // ... (keep existing detectTextFields implementation)
+        NSLog("\n🔍 Scanning for text input fields...")
+        
+        let systemWideElement = AXUIElementCreateSystemWide()
+        
+        var focusedApp: CFTypeRef?
+        AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedApplicationAttribute as CFString, &focusedApp)
+        
+        guard let app = focusedApp else {
+            NSLog("No focused application found")
+            return
+        }
+        
+        if let textField = findFirstTextField(in: app as! AXUIElement) {
+            NSLog("✅ Found text field")
+            
+            if let fieldRect = getTextFieldRect(textField) {
+                checkStabilityAndClick(fieldRect, textField: textField)
+            }
+        } else {
+            NSLog("No text field found")
+            consecutiveMatchCount = 0
+            lastMatchRect = nil
+        }
+    }
+    
+    private func findFirstTextField(in element: AXUIElement) -> AXUIElement? {
+        var role: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
+        
+        if let roleString = role as? String {
+            if roleString == kAXTextFieldRole ||
+               roleString == kAXTextAreaRole ||
+               roleString == kAXComboBoxRole ||
+               roleString == "AXSearchField" {
+                return element
+            }
+        }
+        
+        var children: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children) == .success,
+           let childArray = children as? [AXUIElement] {
+            for child in childArray {
+                if let found = findFirstTextField(in: child) {
+                    return found
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func getTextFieldRect(_ element: AXUIElement) -> CGRect? {
+        var position: CFTypeRef?
+        var size: CFTypeRef?
+        
+        AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &position)
+        AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size)
+        
+        if let posValue = position, let sizeValue = size {
+            var point = CGPoint.zero
+            var dimensions = CGSize.zero
+            
+            AXValueGetValue(posValue as! AXValue, .cgPoint, &point)
+            AXValueGetValue(sizeValue as! AXValue, .cgSize, &dimensions)
+            
+            return CGRect(origin: point, size: dimensions)
+        }
+        
+        return nil
+    }
+    
+    private func checkStabilityAndClick(_ rect: CGRect, textField: AXUIElement?) {
+        if let prevRect = lastMatchRect,
+           abs(prevRect.origin.x - rect.origin.x) < 5 &&
+           abs(prevRect.origin.y - rect.origin.y) < 5 {
+            
+            consecutiveMatchCount += 1
+            
+            if consecutiveMatchCount >= 2 {
+                NSLog("✅ Text field position stable, clicking...")
+                
+                lastFoundRect = rect
+                timer?.invalidate()
+                timer = nil
+                
+                let centerX = rect.midX
+                let centerY = rect.midY
+                
+                guard let screen = NSScreen.main else { return }
+                let displayY = screen.frame.height - centerY
+                
+                overlayWindow?.highlightText(at: CGRect(
+                    x: rect.origin.x,
+                    y: screen.frame.height - rect.origin.y - rect.height,
+                    width: rect.width,
+                    height: rect.height
+                ))
+                overlayWindow?.showClickPoint(at: CGPoint(x: centerX, y: displayY))
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    if let textField = textField {
+                        AXUIElementSetAttributeValue(textField, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                    }
+                    
+                    self?.performClick(x: centerX, y: centerY)
+                    
+                    if self?.autoType == true, let message = self?.typeMessage, !message.isEmpty {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            self?.typeText(message)
+                            self?.consecutiveMatchCount = 0
+                        }
+                    } else {
+                        self?.consecutiveMatchCount = 0
+                    }
+                }
+            }
+        } else {
+            consecutiveMatchCount = 0
+            lastMatchRect = rect
+            
+            guard let screen = NSScreen.main else { return }
+            overlayWindow?.highlightText(at: CGRect(
+                x: rect.origin.x,
+                y: screen.frame.height - rect.origin.y - rect.height,
+                width: rect.width,
+                height: rect.height
+            ))
+        }
+    }
+    
+    private func typeText(_ text: String) {
+        NSLog("⌨️ Typing text: '\(text)'")
+        
+        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+        
+        for character in text {
+            let chars = Array(String(character).utf16)
+            
+            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
+                continue
+            }
+            
+            chars.withUnsafeBufferPointer { buffer in
+                keyDown.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: buffer.baseAddress)
+                keyUp.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: buffer.baseAddress)
+            }
+            
+            keyDown.post(tap: .cghidEventTap)
+            usleep(10_000)
+            keyUp.post(tap: .cghidEventTap)
+            usleep(30_000)
+        }
+        
+        NSLog("✅ Finished typing text")
     }
     
     private func promptForAccessibilityPermission() {
