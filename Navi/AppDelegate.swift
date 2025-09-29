@@ -56,22 +56,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 class ControlWindow: NSWindow {
     weak var textDetector: TextDetector?
     
-    private var searchField: NSTextField!
-    private var urlField: NSTextField!
-    private var statusLabel: NSTextField!
-    private var startButton: NSButton!
+    // Section 1: Click Button/Link
+    private var clickSearchField: NSTextField!
+    private var clickExactMatchCheckbox: NSButton!
+    private var clickCaseSensitiveCheckbox: NSButton!
+    private var clickAutoCheckbox: NSButton!
+    private var startClickDetectionButton: NSButton!
+    
+    // Section 2: Type in Field
+    private var typeMessageField: NSTextField!
+    private var typeAutoCheckbox: NSButton!
+    private var startTypeDetectionButton: NSButton!
+    
+    // Shared controls
     private var stopButton: NSButton!
-    private var exactMatchCheckbox: NSButton!
-    private var caseSensitiveCheckbox: NSButton!
-    private var autoClickCheckbox: NSButton!
+    private var statusLabel: NSTextField!
+    private var urlField: NSTextField!
     private var openBrowserButton: NSButton!
-    private var clickFoundTextButton: NSButton!
     
     init(textDetector: TextDetector) {
         self.textDetector = textDetector
         
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 450, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: 450, height: 540),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -89,70 +96,131 @@ class ControlWindow: NSWindow {
         // Title Label
         let titleLabel = createLabel(
             text: "Navi Control Panel",
-            frame: NSRect(x: 20, y: 350, width: 410, height: 30),
+            frame: NSRect(x: 20, y: 490, width: 410, height: 30),
             fontSize: 18,
             weight: .bold
         )
         contentView.addSubview(titleLabel)
         
-        // Search Field
-        searchField = NSTextField(frame: NSRect(x: 20, y: 300, width: 410, height: 30))
-        searchField.placeholderString = "Enter text to find on screen"
-        contentView.addSubview(searchField)
+        // ==================== SECTION 1: CLICK BUTTON/LINK ====================
         
-        // Checkboxes
-        exactMatchCheckbox = NSButton(checkboxWithTitle: "Exact match only", target: nil, action: nil)
-        exactMatchCheckbox.frame = NSRect(x: 20, y: 265, width: 140, height: 25)
-        exactMatchCheckbox.state = .off
-        contentView.addSubview(exactMatchCheckbox)
+        // Section 1 Header
+        let clickSectionLabel = createLabel(
+            text: "🖱️ Click Button or Link",
+            frame: NSRect(x: 20, y: 450, width: 410, height: 25),
+            fontSize: 14,
+            weight: .semibold
+        )
+        clickSectionLabel.alignment = .left
+        clickSectionLabel.textColor = .systemBlue
+        contentView.addSubview(clickSectionLabel)
         
-        caseSensitiveCheckbox = NSButton(checkboxWithTitle: "Case sensitive", target: nil, action: nil)
-        caseSensitiveCheckbox.frame = NSRect(x: 165, y: 265, width: 120, height: 25)
-        caseSensitiveCheckbox.state = .off
-        contentView.addSubview(caseSensitiveCheckbox)
+        // Click Search Field
+        clickSearchField = NSTextField(frame: NSRect(x: 20, y: 410, width: 410, height: 30))
+        clickSearchField.placeholderString = "Enter button/link text to click (e.g., 'Submit', 'Sign In')"
+        contentView.addSubview(clickSearchField)
         
-        autoClickCheckbox = NSButton(checkboxWithTitle: "Auto-click", target: nil, action: nil)
-        autoClickCheckbox.frame = NSRect(x: 290, y: 265, width: 140, height: 25)
-        autoClickCheckbox.state = .off
-        autoClickCheckbox.toolTip = "Automatically click when text is found"
-        contentView.addSubview(autoClickCheckbox)
+        // Click Options
+        clickExactMatchCheckbox = NSButton(checkboxWithTitle: "Exact match", target: nil, action: nil)
+        clickExactMatchCheckbox.frame = NSRect(x: 20, y: 380, width: 100, height: 20)
+        clickExactMatchCheckbox.state = .off
+        contentView.addSubview(clickExactMatchCheckbox)
         
-        // Detection Buttons
-        startButton = NSButton(frame: NSRect(x: 20, y: 210, width: 200, height: 35))
-        startButton.title = "Start Detection"
-        startButton.bezelStyle = .rounded
-        startButton.target = self
-        startButton.action = #selector(startDetection)
-        contentView.addSubview(startButton)
+        clickCaseSensitiveCheckbox = NSButton(checkboxWithTitle: "Case sensitive", target: nil, action: nil)
+        clickCaseSensitiveCheckbox.frame = NSRect(x: 130, y: 380, width: 110, height: 20)
+        clickCaseSensitiveCheckbox.state = .off
+        contentView.addSubview(clickCaseSensitiveCheckbox)
         
-        stopButton = NSButton(frame: NSRect(x: 230, y: 210, width: 200, height: 35))
-        stopButton.title = "Stop Detection"
+        clickAutoCheckbox = NSButton(checkboxWithTitle: "Auto-click", target: nil, action: nil)
+        clickAutoCheckbox.frame = NSRect(x: 250, y: 380, width: 90, height: 20)
+        clickAutoCheckbox.state = .off
+        clickAutoCheckbox.toolTip = "Automatically click when found"
+        contentView.addSubview(clickAutoCheckbox)
+        
+        // Start Click Detection Button
+        startClickDetectionButton = NSButton(frame: NSRect(x: 20, y: 340, width: 410, height: 32))
+        startClickDetectionButton.title = "Start Detecting Button/Link"
+        startClickDetectionButton.bezelStyle = .rounded
+        startClickDetectionButton.target = self
+        startClickDetectionButton.action = #selector(startClickDetection)
+        contentView.addSubview(startClickDetectionButton)
+        
+        // Divider
+        let divider1 = NSBox(frame: NSRect(x: 20, y: 320, width: 410, height: 1))
+        divider1.boxType = .separator
+        contentView.addSubview(divider1)
+        
+        // ==================== SECTION 2: TYPE IN TEXT FIELD ====================
+        
+        // Section 2 Header
+        let typeSectionLabel = createLabel(
+            text: "⌨️ Auto-Detect & Type in Text Fields",
+            frame: NSRect(x: 20, y: 285, width: 410, height: 25),
+            fontSize: 14,
+            weight: .semibold
+        )
+        typeSectionLabel.alignment = .left
+        typeSectionLabel.textColor = .systemGreen
+        contentView.addSubview(typeSectionLabel)
+        
+        // Instructions Label
+        let instructionsLabel = createLabel(
+            text: "Automatically finds input fields on screen",
+            frame: NSRect(x: 20, y: 260, width: 410, height: 20),
+            fontSize: 11,
+            weight: .regular
+        )
+        instructionsLabel.alignment = .left
+        instructionsLabel.textColor = .secondaryLabelColor
+        contentView.addSubview(instructionsLabel)
+        
+        // Type Message Field
+        typeMessageField = NSTextField(frame: NSRect(x: 20, y: 220, width: 410, height: 30))
+        typeMessageField.placeholderString = "Enter text to type in the detected field"
+        contentView.addSubview(typeMessageField)
+        
+        // Type Options
+        typeAutoCheckbox = NSButton(checkboxWithTitle: "Auto-type when field is found", target: nil, action: nil)
+        typeAutoCheckbox.frame = NSRect(x: 20, y: 190, width: 220, height: 20)
+        typeAutoCheckbox.state = .on
+        typeAutoCheckbox.toolTip = "Automatically click field and type message"
+        contentView.addSubview(typeAutoCheckbox)
+        
+        // Start Type Detection Button
+        startTypeDetectionButton = NSButton(frame: NSRect(x: 20, y: 150, width: 410, height: 32))
+        startTypeDetectionButton.title = "Find Text Field & Type"
+        startTypeDetectionButton.bezelStyle = .rounded
+        startTypeDetectionButton.target = self
+        startTypeDetectionButton.action = #selector(startTypeDetection)
+        contentView.addSubview(startTypeDetectionButton)
+        
+        // Divider
+        let divider2 = NSBox(frame: NSRect(x: 20, y: 115, width: 410, height: 1))
+        divider2.boxType = .separator
+        contentView.addSubview(divider2)
+        
+        // ==================== SHARED CONTROLS ====================
+        
+        // Stop Button (works for both modes)
+        stopButton = NSButton(frame: NSRect(x: 20, y: 75, width: 410, height: 32))
+        stopButton.title = "🛑 Stop Detection"
         stopButton.bezelStyle = .rounded
         stopButton.target = self
         stopButton.action = #selector(stopDetection)
         stopButton.isEnabled = false
         contentView.addSubview(stopButton)
         
-        // Click Found Text Button
-        clickFoundTextButton = NSButton(frame: NSRect(x: 20, y: 165, width: 410, height: 35))
-        clickFoundTextButton.title = "🖱️ Click Found Text"
-        clickFoundTextButton.bezelStyle = .rounded
-        clickFoundTextButton.target = self
-        clickFoundTextButton.action = #selector(clickFoundText)
-        clickFoundTextButton.isEnabled = false
-        clickFoundTextButton.toolTip = "Click on the last found text location"
-        contentView.addSubview(clickFoundTextButton)
-        
         // URL Field
-        urlField = NSTextField(frame: NSRect(x: 20, y: 110, width: 410, height: 30))
-        urlField.placeholderString = "Enter URL (e.g., https://google.com)"
+        urlField = NSTextField(frame: NSRect(x: 20, y: 35, width: 280, height: 28))
+        urlField.placeholderString = "https://example.com"
         urlField.stringValue = "https://google.com"
         contentView.addSubview(urlField)
         
         // Open Browser Button
-        openBrowserButton = NSButton(frame: NSRect(x: 20, y: 70, width: 200, height: 35))
+        openBrowserButton = NSButton(frame: NSRect(x: 310, y: 35, width: 120, height: 28))
         openBrowserButton.title = "Open Browser"
         openBrowserButton.bezelStyle = .rounded
+        openBrowserButton.font = NSFont.systemFont(ofSize: 11)
         openBrowserButton.target = self
         openBrowserButton.action = #selector(openBrowser)
         contentView.addSubview(openBrowserButton)
@@ -160,11 +228,10 @@ class ControlWindow: NSWindow {
         // Status Label
         statusLabel = createLabel(
             text: "Ready",
-            frame: NSRect(x: 20, y: 10, width: 410, height: 50),
-            fontSize: 12,
+            frame: NSRect(x: 20, y: 5, width: 410, height: 25),
+            fontSize: 11,
             weight: .regular
         )
-        statusLabel.maximumNumberOfLines = 3
         statusLabel.textColor = .secondaryLabelColor
         contentView.addSubview(statusLabel)
         
@@ -182,34 +249,60 @@ class ControlWindow: NSWindow {
         return label
     }
     
-    @objc private func startDetection() {
-        let searchText = searchField.stringValue
+    @objc private func startClickDetection() {
+        let searchText = clickSearchField.stringValue
         guard !searchText.isEmpty else {
-            statusLabel.stringValue = "Please enter text to search for"
+            statusLabel.stringValue = "Please enter button/link text to search for"
             statusLabel.textColor = .systemRed
             return
         }
         
-        let exactMatch = exactMatchCheckbox.state == .on
-        let caseSensitive = caseSensitiveCheckbox.state == .on
-        let autoClick = autoClickCheckbox.state == .on
+        let exactMatch = clickExactMatchCheckbox.state == .on
+        let caseSensitive = clickCaseSensitiveCheckbox.state == .on
+        let autoClick = clickAutoCheckbox.state == .on
         
         textDetector?.startDetecting(
             searchText: searchText,
             exactMatch: exactMatch,
             caseSensitive: caseSensitive,
-            autoClick: autoClick
+            autoClick: autoClick,
+            autoType: false,
+            typeMessage: ""
         )
         
-        statusLabel.stringValue = "Detecting: \"\(searchText)\"\(autoClick ? " (Auto-click ON)" : "")"
-        statusLabel.textColor = .systemGreen
-        startButton.isEnabled = false
+        statusLabel.stringValue = "🖱️ Looking for: \"\(searchText)\"\(autoClick ? " (Auto-click)" : "")"
+        statusLabel.textColor = .systemBlue
+        
+        // Only disable click detection controls to prevent conflicts
+        setClickDetectionControlsEnabled(false)
+        setTypeDetectionControlsEnabled(true)  // Keep type detection available
         stopButton.isEnabled = true
-        clickFoundTextButton.isEnabled = true
-        searchField.isEnabled = false
-        exactMatchCheckbox.isEnabled = false
-        caseSensitiveCheckbox.isEnabled = false
-        autoClickCheckbox.isEnabled = false
+    }
+    
+    @objc private func startTypeDetection() {
+        let message = typeMessageField.stringValue
+        
+        guard !message.isEmpty else {
+            statusLabel.stringValue = "Please enter text to type"
+            statusLabel.textColor = .systemRed
+            return
+        }
+        
+        let autoType = typeAutoCheckbox.state == .on
+        
+        // Start detecting text fields (not searching for specific text)
+        textDetector?.startDetectingTextField(
+            typeMessage: message,
+            autoType: autoType
+        )
+        
+        statusLabel.stringValue = "⌨️ Looking for text input field to type: \"\(message)\""
+        statusLabel.textColor = .systemGreen
+        
+        // Only disable type detection controls to prevent conflicts
+        setTypeDetectionControlsEnabled(false)
+        setClickDetectionControlsEnabled(true)  // Keep click detection available
+        stopButton.isEnabled = true
     }
     
     @objc private func stopDetection() {
@@ -217,13 +310,34 @@ class ControlWindow: NSWindow {
         
         statusLabel.stringValue = "Detection stopped"
         statusLabel.textColor = .secondaryLabelColor
-        startButton.isEnabled = true
+        
+        // Re-enable all controls
+        setClickDetectionControlsEnabled(true)
+        setTypeDetectionControlsEnabled(true)
         stopButton.isEnabled = false
-        clickFoundTextButton.isEnabled = false
-        searchField.isEnabled = true
-        exactMatchCheckbox.isEnabled = true
-        caseSensitiveCheckbox.isEnabled = true
-        autoClickCheckbox.isEnabled = true
+    }
+    
+    private func setControlsEnabled(_ enabled: Bool) {
+        // Only disable controls that would conflict with current operation
+        // URL and browser button should always be enabled
+        urlField.isEnabled = true
+        openBrowserButton.isEnabled = true
+    }
+    
+    private func setClickDetectionControlsEnabled(_ enabled: Bool) {
+        // Click detection specific controls
+        clickSearchField.isEnabled = enabled
+        clickExactMatchCheckbox.isEnabled = enabled
+        clickCaseSensitiveCheckbox.isEnabled = enabled
+        clickAutoCheckbox.isEnabled = enabled
+        startClickDetectionButton.isEnabled = enabled
+    }
+    
+    private func setTypeDetectionControlsEnabled(_ enabled: Bool) {
+        // Type detection specific controls
+        typeMessageField.isEnabled = enabled
+        typeAutoCheckbox.isEnabled = enabled
+        startTypeDetectionButton.isEnabled = enabled
     }
     
     @objc private func clickFoundText() {
@@ -455,31 +569,41 @@ class TextDetector {
     private var caseSensitive: Bool = false
     private var lastFoundRect: CGRect?  // Store the last found text position
     private var autoClick: Bool = false  // Whether to auto-click when found
+    private var autoType: Bool = false   // Whether to type after clicking
+    private var typeMessage: String = "" // Message to type
     private var consecutiveMatchCount: Int = 0  // Track stable position
     private var lastMatchRect: CGRect? // Track if position is stable
+    private var isDetectingTextField: Bool = false  // Track detection mode
     
     init(overlayWindow: OverlayWindow) {
         self.overlayWindow = overlayWindow
     }
     
-    func startDetecting(searchText: String, exactMatch: Bool, caseSensitive: Bool, autoClick: Bool = false) {
+    func startDetecting(searchText: String, exactMatch: Bool, caseSensitive: Bool, autoClick: Bool = false, autoType: Bool = false, typeMessage: String = "") {
         NSLog("\n========================================")
         NSLog("Starting detection")
         NSLog("Search text: '\(searchText)'")
         NSLog("Exact match: \(exactMatch)")
         NSLog("Case sensitive: \(caseSensitive)")
         NSLog("Auto-click: \(autoClick)")
+        NSLog("Auto-type: \(autoType)")
+        if !typeMessage.isEmpty {
+            NSLog("Type message: '\(typeMessage)'")
+        }
         NSLog("========================================\n")
         
         self.searchText = caseSensitive ? searchText : searchText.lowercased()
         self.exactMatch = exactMatch
         self.caseSensitive = caseSensitive
         self.autoClick = autoClick
+        self.autoType = autoType
+        self.typeMessage = typeMessage
         self.consecutiveMatchCount = 0
         self.lastMatchRect = nil
+        self.isDetectingTextField = false
         
-        // Check accessibility permission if auto-click is enabled
-        if autoClick && !AXIsProcessTrusted() {
+        // Check accessibility permission if auto-click or auto-type is enabled
+        if (autoClick || autoType) && !AXIsProcessTrusted() {
             promptForAccessibilityPermission()
             return
         }
@@ -496,6 +620,239 @@ class TextDetector {
         }
     }
     
+    func startDetectingTextField(typeMessage: String, autoType: Bool) {
+        NSLog("\n========================================")
+        NSLog("Starting text field detection")
+        NSLog("Will type: '\(typeMessage)'")
+        NSLog("Auto-type: \(autoType)")
+        NSLog("========================================\n")
+        
+        self.typeMessage = typeMessage
+        self.autoType = autoType
+        self.consecutiveMatchCount = 0
+        self.lastMatchRect = nil
+        self.isDetectingTextField = true
+        
+        // Check accessibility permission
+        if !AXIsProcessTrusted() {
+            promptForAccessibilityPermission()
+            return
+        }
+        
+        // Start periodic detection for text fields
+        DispatchQueue.main.async { [weak self] in
+            self?.timer?.invalidate()
+            self?.timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                self?.detectTextFields()
+            }
+            
+            // Do initial detection immediately
+            self?.detectTextFields()
+        }
+    }
+    
+    private func detectTextFields() {
+        NSLog("\n🔍 Scanning for text input fields...")
+        
+        // Use Accessibility API to find text fields
+        let systemWideElement = AXUIElementCreateSystemWide()
+        
+        // Get focused application
+        var focusedApp: CFTypeRef?
+        AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedApplicationAttribute as CFString, &focusedApp)
+        
+        guard let app = focusedApp else {
+            NSLog("No focused application found")
+            return
+        }
+        
+        // Look for text fields in the app
+        if let textField = findFirstTextField(in: app as! AXUIElement) {
+            NSLog("✅ Found text field via Accessibility API")
+            
+            // Get the rect and check stability
+            if let fieldRect = getTextFieldRect(textField) {
+                checkStabilityAndClick(fieldRect, textField: textField)
+            }
+        } else {
+            NSLog("No text field found via Accessibility API")
+            // Reset stability counter when no field is found
+            consecutiveMatchCount = 0
+            lastMatchRect = nil
+        }
+    }
+    
+    private func findFirstTextField(in element: AXUIElement) -> AXUIElement? {
+        var role: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
+        
+        if let roleString = role as? String {
+            // Check if this is a text field
+            if roleString == kAXTextFieldRole ||
+               roleString == kAXTextAreaRole ||
+               roleString == kAXComboBoxRole ||
+               roleString == "AXSearchField" {
+                return element
+            }
+        }
+        
+        // Check children
+        var children: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children) == .success,
+           let childArray = children as? [AXUIElement] {
+            for child in childArray {
+                if let found = findFirstTextField(in: child) {
+                    return found
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func getTextFieldRect(_ element: AXUIElement) -> CGRect? {
+        var position: CFTypeRef?
+        var size: CFTypeRef?
+        
+        AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &position)
+        AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size)
+        
+        if let posValue = position, let sizeValue = size {
+            var point = CGPoint.zero
+            var dimensions = CGSize.zero
+            
+            AXValueGetValue(posValue as! AXValue, .cgPoint, &point)
+            AXValueGetValue(sizeValue as! AXValue, .cgSize, &dimensions)
+            
+            return CGRect(origin: point, size: dimensions)
+        }
+        
+        return nil
+    }
+    
+    private func checkStabilityAndClick(_ rect: CGRect, textField: AXUIElement?) {
+        // Check if position is stable (similar to button detection)
+        if let prevRect = lastMatchRect,
+           abs(prevRect.origin.x - rect.origin.x) < 5 &&
+           abs(prevRect.origin.y - rect.origin.y) < 5 {
+            // Position is stable, increment count
+            consecutiveMatchCount += 1
+            
+            // Click after 2 consecutive stable detections (4 seconds)
+            if consecutiveMatchCount >= 2 {
+                NSLog("✅ Text field position stable, clicking...")
+                
+                // Store the rect for clicking
+                lastFoundRect = rect
+                
+                // Stop detection before clicking
+                timer?.invalidate()
+                timer = nil
+                
+                // Click in the center of the text field
+                let centerX = rect.midX
+                let centerY = rect.midY
+                
+                NSLog("Text field at: (\(Int(centerX)), \(Int(centerY)))")
+                
+                // For Accessibility API coordinates, we need to convert to screen coordinates
+                guard let screen = NSScreen.main else { return }
+                
+                // Accessibility API uses bottom-left origin (same as CGEvent)
+                // Overlay uses top-left origin, so we need to flip for display
+                let displayY = screen.frame.height - centerY
+                
+                // Show visual feedback at the correct display position
+                overlayWindow?.highlightText(at: CGRect(
+                    x: rect.origin.x,
+                    y: screen.frame.height - rect.origin.y - rect.height,
+                    width: rect.width,
+                    height: rect.height
+                ))
+                overlayWindow?.showClickPoint(at: CGPoint(x: centerX, y: displayY))
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    // Try to set focus directly via Accessibility API first
+                    if let textField = textField {
+                        AXUIElementSetAttributeValue(textField, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                        NSLog("Set focus via Accessibility API")
+                    }
+                    
+                    // Click the field - Accessibility coordinates are already in the right system
+                    self?.performClick(x: centerX, y: centerY)
+                    
+                    // Type the message if auto-type is enabled
+                    if self?.autoType == true, let message = self?.typeMessage, !message.isEmpty {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            NSLog("Starting to type: '\(message)'")
+                            self?.typeText(message)
+                            self?.consecutiveMatchCount = 0
+                            NSLog("🛑 Auto-type completed")
+                        }
+                    } else {
+                        self?.consecutiveMatchCount = 0
+                    }
+                }
+            } else {
+                NSLog("⏳ Waiting for stable position... (\(consecutiveMatchCount)/2)")
+            }
+        } else {
+            // Position changed or first detection, reset count
+            consecutiveMatchCount = 0
+            lastMatchRect = rect
+            NSLog("⏳ Text field detected, checking stability...")
+            
+            // For highlighting, convert Accessibility coords to display coords
+            guard let screen = NSScreen.main else { return }
+            overlayWindow?.highlightText(at: CGRect(
+                x: rect.origin.x,
+                y: screen.frame.height - rect.origin.y - rect.height,
+                width: rect.width,
+                height: rect.height
+            ))
+        }
+    }
+    
+    private func typeText(_ text: String) {
+        NSLog("⌨️ Typing text: '\(text)'")
+        
+        // Create event source
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
+            NSLog("Failed to create event source for typing")
+            return
+        }
+        
+        // Type each character
+        for character in text {
+            // Convert character to UniChar array
+            let chars = Array(String(character).utf16)
+            
+            // Create key down event
+            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) else {
+                continue
+            }
+            
+            // Create key up event
+            guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
+                continue
+            }
+            
+            // Set the character string using UniChar array
+            chars.withUnsafeBufferPointer { buffer in
+                keyDown.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: buffer.baseAddress)
+                keyUp.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: buffer.baseAddress)
+            }
+            
+            // Post the events
+            keyDown.post(tap: .cghidEventTap)
+            usleep(10_000) // 10ms delay between key down and up
+            keyUp.post(tap: .cghidEventTap)
+            usleep(30_000) // 30ms delay between characters for natural typing
+        }
+        
+        NSLog("✅ Finished typing text")
+    }
+    
     func stopDetecting() {
         NSLog("\n❌ Stopping detection")
         timer?.invalidate()
@@ -504,6 +861,7 @@ class TextDetector {
         lastFoundRect = nil
         consecutiveMatchCount = 0
         lastMatchRect = nil
+        isDetectingTextField = false
     }
     
     func clickLastFoundText() {
@@ -607,16 +965,6 @@ class TextDetector {
         
         NSLog("   ✅ Click completed!")
         NSLog("================================================\n")
-    }
-    
-    private func clickAtLocation(x: CGFloat, y: CGFloat) {
-        // This is now just a wrapper that shows the click point and performs the click
-        overlayWindow?.showClickPoint(at: CGPoint(x: x, y: y))
-        
-        // Wait for visual feedback then click
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.performClick(x: x, y: y)
-        }
     }
     
     private func promptForAccessibilityPermission() {
@@ -771,9 +1119,28 @@ class TextDetector {
                         // Click after 2 consecutive stable detections (4 seconds)
                         if consecutiveMatchCount >= 2 {
                             NSLog("✅ Element position stable, clicking...")
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                                self?.clickLastFoundText()
-                                self?.consecutiveMatchCount = 0 // Reset after clicking
+                            
+                            // Stop detection after successful auto-action
+                            timer?.invalidate()
+                            timer = nil
+                            NSLog("🛑 Stopping detection after auto-action")
+                            
+                            if autoType && !typeMessage.isEmpty {
+                                // Click and type
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                                    self?.clickLastFoundText()
+                                    // Type after click registers
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                        self?.typeText(self?.typeMessage ?? "")
+                                        self?.consecutiveMatchCount = 0 // Reset after typing
+                                    }
+                                }
+                            } else {
+                                // Just click
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                                    self?.clickLastFoundText()
+                                    self?.consecutiveMatchCount = 0 // Reset after clicking
+                                }
                             }
                         } else {
                             NSLog("⏳ Waiting for stable position... (\(consecutiveMatchCount)/2)")
